@@ -48,7 +48,7 @@ const Navbar = () => {
           ))}
 
           <NavbarButton
-            target={"/sign-in"}
+            target={"/auth"}
             className="bg-red-400 font-bold hover:bg-amber-300"
           >
             <LogIn />
