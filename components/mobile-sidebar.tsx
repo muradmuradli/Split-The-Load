@@ -12,10 +12,17 @@ import { LogIn } from "lucide-react";
 import Link from "next/link";
 import { ReactNode } from "react";
 import { Logo } from "./logo";
+import { SignOutButton } from "./sign-out-button";
 import { Separator } from "./ui/separator";
 import { navItems } from "@/lib/navigation";
 
-export default function MobileSidebar({ children }: { children: ReactNode }) {
+export default function MobileSidebar({
+  children,
+  isSignedIn,
+}: {
+  children: ReactNode;
+  isSignedIn: boolean;
+}) {
   return (
     <Drawer direction="right" autoFocus>
       <DrawerTrigger asChild>{children}</DrawerTrigger>
@@ -40,27 +47,34 @@ export default function MobileSidebar({ children }: { children: ReactNode }) {
 
           <Separator />
 
-          {navItems.map((item) => (
-            <div key={item.href} className="flex flex-col gap-5">
-              <DrawerClose asChild>
-                <Link className="text-xl uppercase" href={item.href}>
-                  {item.label}
-                </Link>
-              </DrawerClose>
+          {isSignedIn &&
+            navItems.map((item) => (
+              <div key={item.href} className="flex flex-col gap-5">
+                <DrawerClose asChild>
+                  <Link className="text-xl uppercase" href={item.href}>
+                    {item.label}
+                  </Link>
+                </DrawerClose>
 
-              <Separator />
-            </div>
-          ))}
+                <Separator />
+              </div>
+            ))}
 
-          <DrawerClose asChild>
-            <Link
-              className="flex items-center gap-2 text-xl uppercase"
-              href="/auth"
-            >
-              Sign In
-              <LogIn />
-            </Link>
-          </DrawerClose>
+          {isSignedIn ? (
+            <DrawerClose asChild>
+              <SignOutButton className="w-full" />
+            </DrawerClose>
+          ) : (
+            <DrawerClose asChild>
+              <Link
+                className="flex items-center gap-2 text-xl uppercase"
+                href="/auth"
+              >
+                Sign In
+                <LogIn />
+              </Link>
+            </DrawerClose>
+          )}
         </div>
 
         <DrawerFooter />

@@ -1,10 +1,13 @@
 import { LogIn, Menu } from "lucide-react";
 import Link from "next/link";
+import { headers } from "next/headers";
 import { Logo } from "./logo";
 import MobileSidebar from "./mobile-sidebar";
+import { SignOutButton } from "./sign-out-button";
 import { Button } from "./ui/button";
 import { ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import { auth } from "@/lib/auth";
 import { navItems } from "@/lib/navigation";
 
 const NavbarButton = ({
@@ -27,7 +30,10 @@ const NavbarButton = ({
   );
 };
 
-const Navbar = () => {
+const Navbar = async () => {
+  const session = await auth.api.getSession({ headers: await headers() });
+  const isSignedIn = !!session;
+
   return (
     <div className="border-b-4 border-b-slate-900 py-5 flex justify-center">
       <div className="flex w-11/12 items-center justify-between md:w-10/12 xl:w-8/12">
@@ -41,21 +47,26 @@ const Navbar = () => {
           </span>
         </Link>
         <div className="hidden xl:flex items-center gap-2 uppercase text-lg">
-          {navItems.map((item) => (
-            <NavbarButton key={item.href} target={item.href}>
-              {item.label}
-            </NavbarButton>
-          ))}
+          {isSignedIn &&
+            navItems.map((item) => (
+              <NavbarButton key={item.href} target={item.href}>
+                {item.label}
+              </NavbarButton>
+            ))}
 
-          <NavbarButton
-            target={"/auth"}
-            className="bg-red-400 font-bold hover:bg-amber-300"
-          >
-            <LogIn />
-            Sign In
-          </NavbarButton>
+          {isSignedIn ? (
+            <SignOutButton className="bg-red-400 font-bold hover:bg-amber-300" />
+          ) : (
+            <NavbarButton
+              target={"/auth"}
+              className="bg-red-400 font-bold hover:bg-amber-300"
+            >
+              <LogIn />
+              Sign In
+            </NavbarButton>
+          )}
         </div>
-        <MobileSidebar>
+        <MobileSidebar isSignedIn={isSignedIn}>
           <Button
             className="border-none bg-transparent xl:hidden"
             size="icon"

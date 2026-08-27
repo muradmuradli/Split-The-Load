@@ -15,9 +15,29 @@ export const signupSchema = z
     ...baseFields,
     fullName: z
       .string()
-      .min(2, "First name must be at least 2 characters")
-      .max(25, "First name must be under 25 characters")
-      .regex(/^[a-zA-Z'-]+$/, "Only letters, hyphens, and apostrophes allowed"),
+      .trim()
+      .min(2, "Full name must be at least 2 characters")
+      .max(50, "Full name must be under 50 characters")
+      .regex(
+        /^[a-zA-Z'-]+(?:\s[a-zA-Z'-]+)*$/,
+        "Only letters, spaces, hyphens, and apostrophes allowed",
+      ),
+    password: baseFields.password
+      .regex(/[A-Z]/, "Must contain an uppercase letter")
+      .regex(/[0-9]/, "Must contain a number"),
+    confirmPassword: z.string(),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: "Passwords don't match",
+    path: ["confirmPassword"],
+  });
+
+export const forgotPasswordSchema = z.object({
+  email: baseFields.email,
+});
+
+export const resetPasswordSchema = z
+  .object({
     password: baseFields.password
       .regex(/[A-Z]/, "Must contain an uppercase letter")
       .regex(/[0-9]/, "Must contain a number"),
@@ -30,3 +50,5 @@ export const signupSchema = z
 
 export type SigninFormValues = z.infer<typeof signinSchema>;
 export type SignupFormValues = z.infer<typeof signupSchema>;
+export type ForgotPasswordFormValues = z.infer<typeof forgotPasswordSchema>;
+export type ResetPasswordFormValues = z.infer<typeof resetPasswordSchema>;

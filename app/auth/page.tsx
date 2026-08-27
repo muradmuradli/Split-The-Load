@@ -1,17 +1,18 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
+import Link from "next/link";
 import { toast } from "sonner";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useActionState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   signinSchema,
   signupSchema,
   type SignupFormValues,
 } from "@/lib/schemas/auth";
-import { signin, signup, type AuthState } from "@/app/actions/auth";
+import { authClient } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -31,25 +32,42 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
-const initialState: AuthState = { success: false };
+function PasswordToggle({
+  show,
+  onToggle,
+}: {
+  show: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      tabIndex={-1}
+      onClick={onToggle}
+      className="absolute right-3 top-1/2 -translate-y-1/2 text-foreground/60 hover:text-foreground"
+      aria-label={show ? "Hide password" : "Show password"}
+    >
+      {show ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+    </button>
+  );
+}
 
 export default function AuthPage() {
+  return (
+    <Suspense>
+      <AuthPageContent />
+    </Suspense>
+  );
+}
+
+function AuthPageContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const isSignup = mode === "signup";
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-
-  const [signinState, signinAction, isSigninPending] = useActionState(
-    signin,
-    initialState,
-  );
-  const [signupState, signupAction, isSignupPending] = useActionState(
-    signup,
-    initialState,
-  );
-  const state = isSignup ? signupState : signinState;
-  const formAction = isSignup ? signupAction : signinAction;
-  const isPending = isSignup ? isSignupPending : isSigninPending;
+  const [isPending, setIsPending] = useState(false);
 
   const form = useForm<SignupFormValues>({
     resolver: zodResolver(isSignup ? signupSchema : signinSchema) as any,
@@ -61,28 +79,73 @@ export default function AuthPage() {
     },
   });
 
-  // Field-keyed errors go through FormMessage; formError is a generic,
-  // non-field error (e.g. invalid credentials) surfaced as a toast instead.
-  useEffect(() => {
-    if (!state.errors) return;
-    const { formError, ...fieldErrors } = state.errors;
-    for (const [field, messages] of Object.entries(fieldErrors)) {
-      if (messages?.[0]) {
-        form.setError(field as keyof SignupFormValues, {
-          type: "server",
-          message: messages[0],
-        });
-      }
-    }
-    if (formError?.[0]) {
-      toast.error(formError[0]);
-    }
-  }, [state.errors, form]);
-
   const switchMode = (nextMode: "signin" | "signup") => {
     setMode(nextMode);
     form.reset();
   };
+
+  const handleSigninSubmit = form.handleSubmit(async (values) => {
+    setIsPending(true);
+    const { error } = await authClient.signIn.email({
+      email: values.email,
+      password: values.password,
+    });
+    setIsPending(false);
+
+    if (error) {
+      // Deliberately vague — don't reveal whether the email exists.
+      toast.error("Invalid email or password");
+      return;
+    }
+
+    toast.success("Signed in!");
+    router.push("/dashboard");
+    // The navbar reads the session in a Server Component; a plain client
+    // navigation reuses its cached render, so force it to re-fetch.
+    router.refresh();
+  });
+
+  const handleSignupSubmit = form.handleSubmit(async (values) => {
+    setIsPending(true);
+    const { error } = await authClient.signUp.email({
+      name: values.fullName,
+      email: values.email,
+      password: values.password,
+    });
+    setIsPending(false);
+
+    if (error) {
+      if (error.code === "USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL") {
+        form.setError("email", { message: "Email is already taken" });
+      } else {
+        toast.error(error.message ?? "Something went wrong. Please try again.");
+      }
+      return;
+    }
+
+    router.push(`/verify-email?email=${encodeURIComponent(values.email)}`);
+    // Signup auto-creates a session (autoSignIn), so the navbar's cached
+    // Server Component render needs a refresh to reflect it too.
+    router.refresh();
+  });
+
+  // Show a one-time toast when arriving here after a successful email
+  // verification or password reset, then strip the query param so a
+  // refresh doesn't repeat it.
+  const hasShownAuthToast = useRef(false);
+  useEffect(() => {
+    if (hasShownAuthToast.current) return;
+
+    if (searchParams.get("verified") === "true") {
+      hasShownAuthToast.current = true;
+      toast.success("Email verified! You can now sign in.");
+      router.replace("/auth");
+    } else if (searchParams.get("reset") === "true") {
+      hasShownAuthToast.current = true;
+      toast.success("Password reset! You can now sign in with your new password.");
+      router.replace("/auth");
+    }
+  }, [searchParams, router]);
 
   return (
     <div className="mx-auto flex w-full flex-col items-center gap-6 px-4 xl:py-5 sm:w-[80%] sm:gap-8 md:w-[60%] lg:w-[40%] xl:w-[27%]">
@@ -128,7 +191,10 @@ export default function AuthPage() {
           </div>
 
           <Form {...form}>
-            <form action={formAction} className="flex flex-col gap-4">
+            <form
+              onSubmit={isSignup ? handleSignupSubmit : handleSigninSubmit}
+              className="flex flex-col gap-4"
+            >
               {isSignup && (
                 <FormField
                   control={form.control}
@@ -177,26 +243,24 @@ export default function AuthPage() {
                           className="pr-10"
                         />
                       </FormControl>
-                      <button
-                        type="button"
-                        tabIndex={-1}
-                        onClick={() => setShowPassword((v) => !v)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-foreground/60 hover:text-foreground"
-                        aria-label={
-                          showPassword ? "Hide password" : "Show password"
-                        }
-                      >
-                        {showPassword ? (
-                          <EyeOff className="size-4" />
-                        ) : (
-                          <Eye className="size-4" />
-                        )}
-                      </button>
+                      <PasswordToggle
+                        show={showPassword}
+                        onToggle={() => setShowPassword((v) => !v)}
+                      />
                     </div>
                     <FormMessage />
                   </FormItem>
                 )}
               />
+
+              {!isSignup && (
+                <Link
+                  href="/forgot-password"
+                  className="-mt-2 self-end text-xs font-bold uppercase text-foreground/70 underline"
+                >
+                  Forgot password?
+                </Link>
+              )}
 
               {isSignup && (
                 <FormField
@@ -213,23 +277,10 @@ export default function AuthPage() {
                             className="pr-10"
                           />
                         </FormControl>
-                        <button
-                          type="button"
-                          tabIndex={-1}
-                          onClick={() => setShowConfirmPassword((v) => !v)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-foreground/60 hover:text-foreground"
-                          aria-label={
-                            showConfirmPassword
-                              ? "Hide password"
-                              : "Show password"
-                          }
-                        >
-                          {showConfirmPassword ? (
-                            <EyeOff className="size-4" />
-                          ) : (
-                            <Eye className="size-4" />
-                          )}
-                        </button>
+                        <PasswordToggle
+                          show={showConfirmPassword}
+                          onToggle={() => setShowConfirmPassword((v) => !v)}
+                        />
                       </div>
                       <FormMessage />
                     </FormItem>
@@ -250,12 +301,6 @@ export default function AuthPage() {
                     ? "Create Account"
                     : "Sign in"}
               </Button>
-
-              {state.success && state.message && (
-                <p className="text-center text-xs font-heading uppercase text-emerald-600">
-                  {state.message}
-                </p>
-              )}
             </form>
           </Form>
         </CardContent>
