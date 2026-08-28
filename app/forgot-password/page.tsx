@@ -73,8 +73,7 @@ export default function ForgotPasswordPage() {
         <CardContent className="flex flex-col gap-6">
           {isSent ? (
             <p className="text-center text-sm text-foreground/80">
-              If an account exists for that email, a reset link has been
-              sent.
+              If an account exists for that email, a reset link has been sent.
             </p>
           ) : (
             <Form {...form}>
@@ -107,15 +106,16 @@ export default function ForgotPasswordPage() {
               </form>
             </Form>
           )}
-
-          <Link
-            href="/auth"
-            className="text-center text-xs font-bold uppercase text-foreground/70 underline"
-          >
-            Back to sign in
-          </Link>
         </CardContent>
       </Card>
+
+      <Link
+        href="/auth"
+        className="inline-flex flex-col items-center gap-1 text-sm font-bold uppercase hover:text-foreground/80"
+      >
+        <span>Back to Signin</span>
+        <div className="h-1 w-full bg-current" />
+      </Link>
     </div>
   );
 }

@@ -142,7 +142,9 @@ function AuthPageContent() {
       router.replace("/auth");
     } else if (searchParams.get("reset") === "true") {
       hasShownAuthToast.current = true;
-      toast.success("Password reset! You can now sign in with your new password.");
+      toast.success(
+        "Password reset! You can now sign in with your new password.",
+      );
       router.replace("/auth");
     }
   }, [searchParams, router]);
@@ -254,12 +256,15 @@ function AuthPageContent() {
               />
 
               {!isSignup && (
-                <Link
-                  href="/forgot-password"
-                  className="-mt-2 self-end text-xs font-bold uppercase text-foreground/70 underline"
-                >
-                  Forgot password?
-                </Link>
+                <div className="flex flex-col items-end self-end w-fit">
+                  <Link
+                    href="/forgot-password"
+                    className="text-sm font-bold text-foreground uppercase hover:text-foreground/80"
+                  >
+                    Forgot password?
+                  </Link>
+                  <div className="h-1 bg-red-400 w-full"></div>
+                </div>
               )}
 
               {isSignup && (
@@ -305,6 +310,14 @@ function AuthPageContent() {
           </Form>
         </CardContent>
       </Card>
+
+      <Link
+        href="/"
+        className="inline-flex flex-col items-center gap-1 text-sm font-bold uppercase hover:text-foreground/80"
+      >
+        <span>Back to Home</span>
+        <div className="h-1 w-full bg-current" />
+      </Link>
     </div>
   );
 }
