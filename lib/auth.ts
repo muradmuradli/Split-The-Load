@@ -12,6 +12,21 @@ export const auth = betterAuth({
     provider: "pg",
     schema,
   }),
+  // A static baseURL/BETTER_AUTH_URL breaks on Vercel: the origin-check
+  // middleware rejects any request whose Origin doesn't match it, and
+  // BETTER_AUTH_URL only ever points at one deployment. Resolving baseURL
+  // per-request against an allowlist fixes this for the production domain
+  // and every preview deployment alike.
+  baseURL: {
+    allowedHosts: ["localhost:3000", "splittheload.vercel.app", "*.vercel.app"],
+    fallback: process.env.BETTER_AUTH_URL ?? "http://localhost:3000",
+  },
+  advanced: {
+    // Vercel's edge network terminates TLS and forwards the original
+    // host/protocol via these headers; trust them so baseURL resolves to
+    // https://splittheload.vercel.app instead of an internal http URL.
+    trustedProxyHeaders: true,
+  },
   emailAndPassword: {
     enabled: true,
     requireEmailVerification: false,
