@@ -3,6 +3,7 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { nextCookies } from "better-auth/next-js";
 import { emailOTP } from "better-auth/plugins";
 
+import { SKIP_VERIFICATION_EMAIL_HEADER } from "./auth-constants";
 import { db } from "./db";
 import * as schema from "./db/schema";
 import { sendEmail } from "./email";
@@ -52,7 +53,11 @@ export const auth = betterAuth({
       // Already the default — set explicitly since a 6-character code is required.
       otpLength: 6,
       sendVerificationOnSignUp: true,
-      async sendVerificationOTP({ email, otp }) {
+      async sendVerificationOTP({ email, otp }, ctx) {
+        // The invite-signup flow already proved ownership of this email by
+        // clicking the tokenized invite link — skip the redundant OTP email.
+        if (ctx?.headers?.get(SKIP_VERIFICATION_EMAIL_HEADER)) return;
+
         await sendEmail({
           to: email,
           subject: "Verify your email — Split the Load",

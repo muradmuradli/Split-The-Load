@@ -15,6 +15,13 @@
       "when": 1788186005793,
       "tag": "0001_normal_lady_deathstrike",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1788255998916,
+      "tag": "0002_thick_apocalypse",
+      "breakpoints": true
     }
   ]
 }
