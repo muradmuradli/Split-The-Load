@@ -5,6 +5,7 @@ import {
   timestamp,
   boolean,
   date,
+  integer,
   index,
   uniqueIndex,
   uuid,
@@ -84,14 +85,8 @@ export const verification = pgTable(
   (table) => [index("verification_identifier_idx").on(table.identifier)],
 );
 
-export const membershipRoleEnum = pgEnum("membership_role", [
-  "admin",
-  "member",
-]);
-export const membershipStatusEnum = pgEnum("membership_status", [
-  "pending",
-  "verified",
-]);
+export const membershipRoleEnum = pgEnum("membership_role", ["admin", "member"]);
+export const membershipStatusEnum = pgEnum("membership_status", ["pending", "verified"]);
 
 export const flat = pgTable("flat", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -137,12 +132,9 @@ export const membership = pgTable(
   ],
 );
 
-export const taskEffortEnum = pgEnum("task_effort", [
-  "quick",
-  "medium",
-  "heavy",
-]);
+export const taskEffortEnum = pgEnum("task_effort", ["quick", "medium", "heavy"]);
 export const taskStatusEnum = pgEnum("task_status", ["todo", "done"]);
+export const effortRatingEnum = pgEnum("effort_rating", ["easier", "about_right", "harder"]);
 
 export const task = pgTable(
   "task",
@@ -155,15 +147,24 @@ export const task = pgTable(
     description: text("description"),
     effort: taskEffortEnum("effort").notNull(),
     status: taskStatusEnum("status").notNull().default("todo"),
+    // The task's live effort score. Seeded from `effort` at creation, then
+    // drifts over time for recurring tasks as completions get rated — see
+    // lib/effort.ts's adjustEffortPoints. The migration backfills existing
+    // rows from `effort` before adding the NOT NULL constraint.
+    effortPoints: integer("effort_points").notNull(),
+    isRecurring: boolean("is_recurring").notNull().default(false),
+    // Only set when isRecurring is true.
+    recurrenceIntervalDays: integer("recurrence_interval_days"),
+    // Nullable rather than NOT NULL so existing tasks created before this
+    // column existed don't break; the create-task form requires it going
+    // forward.
+    dueDate: date("due_date"),
     // Null means unassigned (shouldn't normally happen — "auto" resolves to
     // a member at creation time — but a member's removal from the flat also
     // nulls this out rather than deleting the task).
-    assigneeMembershipId: uuid("assignee_membership_id").references(
-      () => membership.id,
-      {
-        onDelete: "set null",
-      },
-    ),
+    assigneeMembershipId: uuid("assignee_membership_id").references(() => membership.id, {
+      onDelete: "set null",
+    }),
     createdBy: text("created_by")
       .notNull()
       .references(() => user.id, { onDelete: "restrict" }),
@@ -179,12 +180,34 @@ export const task = pgTable(
   ],
 );
 
+export const completion = pgTable(
+  "completion",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    taskId: uuid("task_id")
+      .notNull()
+      .references(() => task.id, { onDelete: "cascade" }),
+    completedBy: text("completed_by")
+      .notNull()
+      .references(() => user.id, { onDelete: "restrict" }),
+    completedAt: timestamp("completed_at").defaultNow().notNull(),
+    // Snapshot of the task's effortPoints at the moment this instance was
+    // completed — preserves historical accuracy even as the live task's
+    // effortPoints keeps drifting for later occurrences.
+    effortPointsAtCompletion: integer("effort_points_at_completion").notNull(),
+    // Only meaningful for recurring tasks; null for one-off completions.
+    effortRating: effortRatingEnum("effort_rating"),
+  },
+  (table) => [index("completion_taskId_idx").on(table.taskId)],
+);
+
 export const userRelations = relations(user, ({ many }) => ({
   sessions: many(session),
   accounts: many(account),
   flatsCreated: many(flat),
   memberships: many(membership),
   tasksCreated: many(task),
+  completions: many(completion),
 }));
 
 export const flatRelations = relations(flat, ({ one, many }) => ({
@@ -208,7 +231,7 @@ export const membershipRelations = relations(membership, ({ one, many }) => ({
   assignedTasks: many(task),
 }));
 
-export const taskRelations = relations(task, ({ one }) => ({
+export const taskRelations = relations(task, ({ one, many }) => ({
   flat: one(flat, {
     fields: [task.flatId],
     references: [flat.id],
@@ -219,6 +242,18 @@ export const taskRelations = relations(task, ({ one }) => ({
   }),
   creator: one(user, {
     fields: [task.createdBy],
+    references: [user.id],
+  }),
+  completions: many(completion),
+}));
+
+export const completionRelations = relations(completion, ({ one }) => ({
+  task: one(task, {
+    fields: [completion.taskId],
+    references: [task.id],
+  }),
+  completedByUser: one(user, {
+    fields: [completion.completedBy],
     references: [user.id],
   }),
 }));

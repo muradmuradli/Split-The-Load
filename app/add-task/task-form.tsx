@@ -12,7 +12,15 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { EFFORT_COLORS, EFFORT_LABELS, EFFORT_LEVELS, EFFORT_POINTS, type Effort } from "@/lib/effort";
+import {
+  EFFORT_COLORS,
+  EFFORT_LABELS,
+  EFFORT_LEVELS,
+  RECURRENCE_PRESETS,
+  STARTING_EFFORT_POINTS,
+  type Effort,
+  type RecurrencePreset,
+} from "@/lib/effort";
 import type { FlatWithMembers } from "@/lib/flats";
 import {
   formatDueDate,
@@ -47,6 +55,14 @@ export function TaskForm({ flat }: { flat: FlatWithMembers }) {
   const [assignee, setAssignee] = useState<string>("auto");
   const [dueDate, setDueDate] = useState<string>(() => toISODateString(new Date()));
   const [calendarOpen, setCalendarOpen] = useState(false);
+  const [isRecurring, setIsRecurring] = useState(false);
+  const [recurrencePreset, setRecurrencePreset] = useState<RecurrencePreset>("weekly");
+  const [customDays, setCustomDays] = useState("7");
+
+  const recurrenceIntervalDays =
+    recurrencePreset === "custom"
+      ? Number.parseInt(customDays, 10) || 0
+      : (RECURRENCE_PRESETS.find((p) => p.value === recurrencePreset)?.days ?? 0);
 
   const verifiedMembers = flat.members.filter((m) => m.status === "verified");
 
@@ -69,6 +85,12 @@ export function TaskForm({ flat }: { flat: FlatWithMembers }) {
         <input type="hidden" name="effort" value={effort} />
         <input type="hidden" name="assignee" value={assignee} />
         <input type="hidden" name="dueDate" value={dueDate} />
+        <input type="hidden" name="isRecurring" value={String(isRecurring)} />
+        <input
+          type="hidden"
+          name="recurrenceIntervalDays"
+          value={isRecurring ? String(recurrenceIntervalDays) : ""}
+        />
 
         <Card>
           <CardContent className="flex flex-col gap-5">
@@ -137,12 +159,78 @@ export function TaskForm({ flat }: { flat: FlatWithMembers }) {
                 >
                   <span className="block text-2xl uppercase">{EFFORT_LABELS[level]}</span>
                   <span className="mt-1 block text-xs font-extrabold uppercase">
-                    {EFFORT_POINTS[level]} pts
+                    {STARTING_EFFORT_POINTS[level]} pts
                   </span>
                   <span className="mt-2 block text-sm font-semibold">{EFFORT_BLURBS[level]}</span>
                 </button>
               ))}
             </div>
+          </CardContent>
+        </Card>
+
+        <Card className={isRecurring ? "bg-lime-300" : undefined}>
+          <CardContent className="flex flex-col gap-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="text-xs font-extrabold uppercase">Repeats?</p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsRecurring(false)}
+                  className={`border-2 border-border px-4 py-2 font-extrabold uppercase ${
+                    !isRecurring ? "bg-white shadow-shadow" : "bg-secondary-background hover:bg-amber-300"
+                  }`}
+                >
+                  One-off
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsRecurring(true)}
+                  className={`border-2 border-border px-4 py-2 font-extrabold uppercase ${
+                    isRecurring ? "bg-white shadow-shadow" : "bg-secondary-background hover:bg-amber-300"
+                  }`}
+                >
+                  Repeats
+                </button>
+              </div>
+            </div>
+
+            {isRecurring && (
+              <div className="flex flex-col gap-3">
+                <div className="flex flex-wrap gap-3">
+                  {RECURRENCE_PRESETS.map((preset) => (
+                    <button
+                      key={preset.value}
+                      type="button"
+                      onClick={() => setRecurrencePreset(preset.value)}
+                      className={`border-2 border-border px-4 py-2 font-extrabold uppercase ${
+                        recurrencePreset === preset.value
+                          ? "bg-white shadow-shadow"
+                          : "bg-secondary-background hover:bg-amber-300"
+                      }`}
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
+                {recurrencePreset === "custom" && (
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="number"
+                      min={1}
+                      value={customDays}
+                      onChange={(e) => setCustomDays(e.target.value)}
+                      className="w-24 bg-white"
+                    />
+                    <span className="text-sm font-bold">days</span>
+                  </div>
+                )}
+                <p className="text-sm font-bold">
+                  Repeats every {recurrenceIntervalDays || "—"} day
+                  {recurrenceIntervalDays === 1 ? "" : "s"}. Completing it adjusts the effort score
+                  and schedules the next one.
+                </p>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -195,7 +283,7 @@ export function TaskForm({ flat }: { flat: FlatWithMembers }) {
         <div className="flex flex-wrap items-center gap-4">
           <SubmitButton />
           <Badge className="bg-secondary-background text-xs font-bold uppercase">
-            Adds {EFFORT_POINTS[effort]} pts to the week
+            Adds {STARTING_EFFORT_POINTS[effort]} pts to the week
           </Badge>
         </div>
       </form>

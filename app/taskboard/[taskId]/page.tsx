@@ -63,8 +63,10 @@ export default async function TaskDetailPage({
         name: task.name,
         description: task.description,
         effort: task.effort,
+        effortPoints: task.effortPoints,
         status: task.status,
-        actualEffort: task.actualEffort,
+        isRecurring: task.isRecurring,
+        recurrenceIntervalDays: task.recurrenceIntervalDays,
         dueDate: task.dueDate,
         assignee: task.assignee
           ? {

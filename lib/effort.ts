@@ -1,13 +1,14 @@
 // Client-safe: no server-only imports (db, auth). Shared between the
-// server-side task service (lib/tasks.ts) and client task-form UI.
+// server-side task service (lib/tasks.ts) and client task/board UI.
 
 export const EFFORT_LEVELS = ["quick", "medium", "heavy"] as const;
 export type Effort = (typeof EFFORT_LEVELS)[number];
 
-export const EFFORT_POINTS: Record<Effort, number> = {
-  quick: 2,
-  medium: 5,
-  heavy: 9,
+/** Starting effortPoints seeded onto a task at creation time. */
+export const STARTING_EFFORT_POINTS: Record<Effort, number> = {
+  quick: 10,
+  medium: 20,
+  heavy: 40,
 };
 
 export const EFFORT_LABELS: Record<Effort, string> = {
@@ -35,18 +36,32 @@ export type TaskMember = {
   image: string | null;
 };
 
-export const ACTUAL_EFFORT_RATINGS = ["easier", "as_expected", "harder"] as const;
-export type ActualEffort = (typeof ACTUAL_EFFORT_RATINGS)[number];
+export const EFFORT_RATINGS = ["easier", "about_right", "harder"] as const;
+export type EffortRating = (typeof EFFORT_RATINGS)[number];
 
-export const ACTUAL_EFFORT_LABELS: Record<ActualEffort, string> = {
-  easier: "Easier",
-  as_expected: "As expected",
-  harder: "Harder",
+export const EFFORT_RATING_LABELS: Record<EffortRating, string> = {
+  easier: "Easier than expected",
+  about_right: "About right",
+  harder: "Harder than expected",
 };
 
-/** Adjusts a task's base effort points by how it was actually rated once done. */
-export function computeAdjustedPoints(basePoints: number, actualEffort: ActualEffort | null) {
-  if (actualEffort === "harder") return basePoints + 2;
-  if (actualEffort === "easier") return Math.max(1, basePoints - 1);
-  return basePoints;
+/**
+ * Drifts a recurring task's effort score by a fixed 10% nudge per rating
+ * (an EMA-style adjustment) rather than resetting it outright, so one
+ * outlier completion doesn't swing the score — it converges gradually
+ * across several completions instead. Floored at 1 so it never hits zero.
+ */
+export function adjustEffortPoints(currentPoints: number, rating: EffortRating | null): number {
+  if (rating === "harder") return Math.round(currentPoints * 1.1);
+  if (rating === "easier") return Math.max(1, Math.round(currentPoints * 0.9));
+  return currentPoints;
 }
+
+export type RecurrencePreset = "daily" | "weekly" | "biweekly" | "custom";
+
+export const RECURRENCE_PRESETS: { value: RecurrencePreset; label: string; days: number | null }[] = [
+  { value: "daily", label: "Daily", days: 1 },
+  { value: "weekly", label: "Weekly", days: 7 },
+  { value: "biweekly", label: "Every 2 weeks", days: 14 },
+  { value: "custom", label: "Custom", days: null },
+];

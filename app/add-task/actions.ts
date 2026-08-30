@@ -22,6 +22,11 @@ export async function createTaskAction(formData: FormData) {
   const effort = String(formData.get("effort") ?? "");
   const dueDate = String(formData.get("dueDate") ?? "");
   const assignee = String(formData.get("assignee") ?? "auto");
+  const isRecurring = formData.get("isRecurring") === "true";
+  const recurrenceIntervalDaysRaw = String(formData.get("recurrenceIntervalDays") ?? "");
+  const recurrenceIntervalDays = recurrenceIntervalDaysRaw
+    ? Number.parseInt(recurrenceIntervalDaysRaw, 10)
+    : null;
 
   if (!flatId) throw new Error("Missing flat.");
   if (!isEffort(effort)) throw new Error("Invalid effort level.");
@@ -32,6 +37,8 @@ export async function createTaskAction(formData: FormData) {
     description,
     effort,
     dueDate,
+    isRecurring,
+    recurrenceIntervalDays,
     assigneeMembershipId: assignee === "auto" ? "auto" : assignee,
     creatorUserId: session.user.id,
   });

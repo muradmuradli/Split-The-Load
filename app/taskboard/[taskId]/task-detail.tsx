@@ -14,35 +14,36 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-  ACTUAL_EFFORT_LABELS,
-  ACTUAL_EFFORT_RATINGS,
-  computeAdjustedPoints,
+  adjustEffortPoints,
   EFFORT_COLORS,
   EFFORT_LABELS,
-  EFFORT_POINTS,
+  EFFORT_RATING_LABELS,
+  EFFORT_RATINGS,
   STATUS_COLORS,
-  type ActualEffort,
   type Effort,
+  type EffortRating,
   type TaskMember,
 } from "@/lib/effort";
 import { formatDueDate, getAvatarColor, getInitials, parseISODate, toISODateString } from "@/lib/utils";
-import { deleteTaskAction, updateTaskAction } from "../actions";
+import { completeTaskAction, deleteTaskAction, updateTaskAction } from "../actions";
 
 type Task = {
   id: string;
   name: string;
   description: string | null;
   effort: Effort;
+  effortPoints: number;
   status: "todo" | "done";
-  actualEffort: ActualEffort | null;
+  isRecurring: boolean;
+  recurrenceIntervalDays: number | null;
   dueDate: string | null;
   assignee: TaskMember | null;
 };
 
-const RATING_COLORS: Record<ActualEffort, string> = {
+const RATING_COLORS: Record<EffortRating, string> = {
   harder: "bg-red-400",
   easier: "bg-green-300",
-  as_expected: "bg-amber-300",
+  about_right: "bg-amber-300",
 };
 
 const selectClass =
@@ -60,7 +61,7 @@ export function TaskDetail({
   autoSuggestName: string | null;
 }) {
   const [done, setDone] = useState(task.status === "done");
-  const [rating, setRating] = useState<ActualEffort | null>(task.actualEffort);
+  const [showRatingPrompt, setShowRatingPrompt] = useState(false);
   const [assignee, setAssignee] = useState<TaskMember | null>(task.assignee);
   const [dueDate, setDueDate] = useState<string | null>(task.dueDate);
   const [calendarOpen, setCalendarOpen] = useState(false);
@@ -74,26 +75,54 @@ export function TaskDetail({
     });
   }
 
-  function toggleDone() {
-    const next = !done;
-    setDone(next);
+  function handleMarkDone() {
+    if (task.isRecurring) {
+      // Reveal the rating prompt — nothing is persisted until a rating is
+      // chosen, since the adjustment + next occurrence need it.
+      setShowRatingPrompt(true);
+      return;
+    }
+    setDone(true);
     startTransition(async () => {
-      const result = await updateTaskAction(task.id, { status: next ? "done" : "todo" });
+      const result = await completeTaskAction(task.id, null);
       if ("error" in result) {
         toast.error(result.error);
-        setDone(!next);
+        setDone(false);
+        return;
+      }
+      toast.success("Task completed.");
+    });
+  }
+
+  function handleMarkNotDone() {
+    setDone(false);
+    setShowRatingPrompt(false);
+    startTransition(async () => {
+      const result = await updateTaskAction(task.id, { status: "todo" });
+      if ("error" in result) {
+        toast.error(result.error);
+        setDone(true);
       }
     });
   }
 
-  function rate(next: ActualEffort) {
-    setRating(next);
+  function handleRate(rating: EffortRating) {
+    setDone(true);
+    setShowRatingPrompt(false);
     startTransition(async () => {
-      const result = await updateTaskAction(task.id, { actualEffort: next });
+      const result = await completeTaskAction(task.id, rating);
       if ("error" in result) {
         toast.error(result.error);
-        setRating(task.actualEffort);
+        setDone(false);
+        setShowRatingPrompt(true);
+        return;
       }
+      const nextPoints = adjustEffortPoints(task.effortPoints, rating);
+      toast.success(
+        task.recurrenceIntervalDays
+          ? `Next occurrence scheduled in ${task.recurrenceIntervalDays} days at ${nextPoints} pts.`
+          : "Task completed.",
+      );
     });
   }
 
@@ -145,7 +174,7 @@ export function TaskDetail({
           size="icon"
           onClick={handleDelete}
           aria-label={`Delete ${task.name}`}
-          className="bg-red-400 hover:bg-red-500"
+          className="bg-red-400 hover:bg-red-400"
         >
           <Trash2 />
         </Button>
@@ -156,10 +185,13 @@ export function TaskDetail({
           <Badge className={`${EFFORT_COLORS[task.effort]} text-foreground`}>
             {EFFORT_LABELS[task.effort]}
           </Badge>
-          <Badge className="bg-white text-foreground">{EFFORT_POINTS[task.effort]} effort pts</Badge>
+          <Badge className="bg-white text-foreground">{task.effortPoints} effort pts</Badge>
           <Badge className={`${STATUS_COLORS[done ? "done" : "todo"]} text-foreground`}>
             {done ? "Done" : "To Do"}
           </Badge>
+          {task.isRecurring && (
+            <Badge variant="neutral">Repeats every {task.recurrenceIntervalDays} days</Badge>
+          )}
         </div>
         <h1 className="mt-4 text-4xl md:text-5xl">{task.name}</h1>
         {task.description && <p className="mt-4 text-lg font-semibold">{task.description}</p>}
@@ -209,7 +241,7 @@ export function TaskDetail({
             <p className="text-xs font-extrabold uppercase">Effort estimate</p>
             <p className="text-4xl uppercase">{EFFORT_LABELS[task.effort]}</p>
             <p className="text-sm font-bold">
-              Counts as {EFFORT_POINTS[task.effort]} of the week&apos;s points.
+              Counts as {task.effortPoints} of the week&apos;s points.
               {due ? ` Due ${due}.` : ""}
             </p>
             <div className="flex flex-col gap-2">
@@ -235,42 +267,45 @@ export function TaskDetail({
 
       <Card>
         <CardContent className="flex flex-col gap-4">
-          <button
-            type="button"
-            onClick={toggleDone}
-            className={`w-full border-2 border-border p-4 text-center text-lg font-extrabold uppercase shadow-shadow hover:translate-x-boxShadowX hover:translate-y-boxShadowY hover:shadow-none ${
-              done ? "bg-secondary-background" : "bg-green-300"
-            }`}
-          >
-            {done ? "Mark as not done" : "Mark done"}
-          </button>
+          {!done && !showRatingPrompt && (
+            <button
+              type="button"
+              onClick={handleMarkDone}
+              className="w-full border-2 border-border bg-green-300 p-4 text-center text-lg font-extrabold uppercase shadow-shadow hover:translate-x-boxShadowX hover:translate-y-boxShadowY hover:shadow-none"
+            >
+              Mark done
+            </button>
+          )}
 
           {done && (
+            <button
+              type="button"
+              onClick={handleMarkNotDone}
+              className="w-full border-2 border-border bg-secondary-background p-4 text-center text-lg font-extrabold uppercase shadow-shadow hover:translate-x-boxShadowX hover:translate-y-boxShadowY hover:shadow-none"
+            >
+              Mark as not done
+            </button>
+          )}
+
+          {showRatingPrompt && (
             <div className="border-2 border-border bg-secondary-background p-4">
-              <p className="text-sm font-extrabold uppercase">Rate the actual effort</p>
+              <p className="text-sm font-extrabold uppercase">How was the effort?</p>
               <p className="mt-1 text-sm font-semibold text-foreground/70">
-                Harder than expected? We&apos;ll weight it heavier next time.
+                This only adjusts the score for the next occurrence — this one stays exactly as it
+                was.
               </p>
               <div className="mt-3 flex flex-wrap gap-3">
-                {ACTUAL_EFFORT_RATINGS.map((r) => (
+                {EFFORT_RATINGS.map((r) => (
                   <button
                     key={r}
                     type="button"
-                    onClick={() => rate(r)}
-                    className={`border-2 border-border px-4 py-2 font-extrabold uppercase ${
-                      rating === r ? `${RATING_COLORS[r]} shadow-shadow` : "bg-white hover:bg-amber-300"
-                    }`}
+                    onClick={() => handleRate(r)}
+                    className={`border-2 border-border px-4 py-2 font-extrabold uppercase ${RATING_COLORS[r]} hover:shadow-shadow`}
                   >
-                    {ACTUAL_EFFORT_LABELS[r]}
+                    {EFFORT_RATING_LABELS[r]}
                   </button>
                 ))}
               </div>
-              {rating && (
-                <p className="mt-3 text-sm font-extrabold uppercase">
-                  Logged as &quot;{ACTUAL_EFFORT_LABELS[rating]}&quot; — counts as{" "}
-                  {computeAdjustedPoints(EFFORT_POINTS[task.effort], rating)} pts
-                </p>
-              )}
             </div>
           )}
         </CardContent>

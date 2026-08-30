@@ -19,7 +19,6 @@ import {
 import {
   EFFORT_COLORS,
   EFFORT_LABELS,
-  EFFORT_POINTS,
   STATUS_COLORS,
   type Effort,
   type TaskMember,
@@ -34,8 +33,10 @@ export type TaskBoardItem = {
   id: string;
   name: string;
   effort: Effort;
+  effortPoints: number;
   status: "todo" | "done";
   dueDate: string | null;
+  isRecurring: boolean;
   assignee: TaskMember | null;
 };
 
@@ -126,12 +127,19 @@ export function TaskBoard({ flatName, tasks }: { flatName: string; tasks: TaskBo
                     className="absolute inset-0 z-10"
                     aria-label={t.name}
                   />
-                  <p className="text-lg font-extrabold">{t.name}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-lg font-extrabold">{t.name}</p>
+                    {t.isRecurring && (
+                      <Badge variant="neutral" className="text-xs font-bold">
+                        Repeats
+                      </Badge>
+                    )}
+                  </div>
                   {due && <p className="text-sm font-semibold text-foreground/70">Due {due}</p>}
                 </TableCell>
                 <TableCell>
                   <Badge className={`${EFFORT_COLORS[t.effort]} text-sm font-bold text-foreground`}>
-                    {EFFORT_LABELS[t.effort]} · {EFFORT_POINTS[t.effort]}
+                    {EFFORT_LABELS[t.effort]} · {t.effortPoints}
                   </Badge>
                 </TableCell>
                 <TableCell>
@@ -173,7 +181,7 @@ export function TaskBoard({ flatName, tasks }: { flatName: string; tasks: TaskBo
                     size="icon"
                     onClick={() => handleDelete(t.id)}
                     aria-label={`Delete ${t.name}`}
-                    className="relative z-20 bg-red-400 hover:bg-red-500"
+                    className="relative z-20 bg-red-400 hover:bg-red-400"
                   >
                     <Trash2 />
                   </Button>

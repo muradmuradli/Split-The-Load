@@ -41,8 +41,10 @@ export default async function TaskBoardPage({
     id: t.id,
     name: t.name,
     effort: t.effort,
+    effortPoints: t.effortPoints,
     status: t.status,
     dueDate: t.dueDate,
+    isRecurring: t.isRecurring,
     assignee: t.assignee
       ? {
           id: t.assignee.id,

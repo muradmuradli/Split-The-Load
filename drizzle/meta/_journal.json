@@ -22,6 +22,34 @@
       "when": 1788255998916,
       "tag": "0002_thick_apocalypse",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1788272781317,
+      "tag": "0003_rich_thaddeus_ross",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1788274612548,
+      "tag": "0004_perpetual_the_initiative",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1788278860107,
+      "tag": "0005_organic_captain_stacy",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1788278894878,
+      "tag": "0006_gifted_frank_castle",
+      "breakpoints": true
     }
   ]
 }
