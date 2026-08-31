@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 
 import { auth } from "@/lib/auth";
 import { getUserFlatsWithMembers } from "@/lib/flats";
-import { getRecentCompletions } from "@/lib/tasks";
+import { getOpenTaskStats, getRecentCompletions } from "@/lib/tasks";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -59,12 +59,17 @@ export default async function DashboardPage() {
     ),
   );
 
+  const openTaskStatsByFlatId = Object.fromEntries(
+    await Promise.all(flats.map(async (f) => [f.id, await getOpenTaskStats(f.id)] as const)),
+  );
+
   return (
     <Suspense>
       <DashboardContent
         flats={flats}
         currentUserId={session.user.id}
         recentCompletionsByFlatId={recentCompletionsByFlatId}
+        openTaskStatsByFlatId={openTaskStatsByFlatId}
       />
     </Suspense>
   );

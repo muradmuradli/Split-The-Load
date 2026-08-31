@@ -30,10 +30,12 @@ export function DashboardContent({
   flats,
   currentUserId,
   recentCompletionsByFlatId,
+  openTaskStatsByFlatId,
 }: {
   flats: FlatWithMembers[];
   currentUserId: string;
   recentCompletionsByFlatId: Record<string, RecentCompletion[]>;
+  openTaskStatsByFlatId: Record<string, { count: number; points: number }>;
 }) {
   const [activeFlatId, setActiveFlatId] = useState(flats[0]?.id);
   const activeFlat = flats.find((f) => f.id === activeFlatId) ?? flats[0];
@@ -71,6 +73,7 @@ export function DashboardContent({
   const myMembership = optimisticMembers.find((m) => m.userId === currentUserId);
   const isAdmin = myMembership?.role === "admin";
   const recentCompletions = recentCompletionsByFlatId[activeFlat.id] ?? [];
+  const openTaskStats = openTaskStatsByFlatId[activeFlat.id] ?? { count: 0, points: 0 };
 
   const handleInvite = (e: FormEvent) => {
     e.preventDefault();
@@ -144,8 +147,10 @@ export function DashboardContent({
         <Card>
           <CardContent>
             <p className="text-xs font-extrabold uppercase">Open tasks</p>
-            <h2 className="mt-2 text-3xl">0</h2>
-            <p className="mt-2 text-sm font-bold">No tasks yet.</p>
+            <h2 className="mt-2 text-3xl">{openTaskStats.count}</h2>
+            <p className="mt-2 text-sm font-bold">
+              {openTaskStats.count === 0 ? "Nothing outstanding." : `${openTaskStats.points} pts still to do`}
+            </p>
           </CardContent>
         </Card>
         <Card className="bg-blue-400">

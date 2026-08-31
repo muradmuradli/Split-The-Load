@@ -36,11 +36,8 @@ export async function getTaskById(taskId: string): Promise<TaskWithAssigneeAndFl
   });
 }
 
-/** The most recently completed tasks for a flat, newest first, with who completed each. */
-export async function getRecentCompletions(
-  flatId: string,
-  limit = 5,
-): Promise<RecentCompletion[]> {
+/** Every completion for a flat, newest first, with who completed each and the task it belongs to. */
+export async function getFlatCompletions(flatId: string, limit?: number): Promise<RecentCompletion[]> {
   const flatTasks = await db.query.task.findMany({
     where: eq(task.flatId, flatId),
     columns: { id: true },
@@ -52,8 +49,25 @@ export async function getRecentCompletions(
     where: inArray(completion.taskId, taskIds),
     with: { task: true, completedByUser: true },
     orderBy: (fields, { desc }) => [desc(fields.completedAt)],
-    limit,
+    ...(limit !== undefined ? { limit } : {}),
   });
+}
+
+/** The most recently completed tasks for a flat — see getFlatCompletions for the unlimited version. */
+export async function getRecentCompletions(flatId: string, limit = 5): Promise<RecentCompletion[]> {
+  return getFlatCompletions(flatId, limit);
+}
+
+/** Count and total effort points of a flat's not-yet-done tasks. */
+export async function getOpenTaskStats(flatId: string): Promise<{ count: number; points: number }> {
+  const openTasks = await db.query.task.findMany({
+    where: and(eq(task.flatId, flatId), eq(task.status, "todo")),
+    columns: { effortPoints: true },
+  });
+  return {
+    count: openTasks.length,
+    points: openTasks.reduce((sum, t) => sum + t.effortPoints, 0),
+  };
 }
 
 /**
