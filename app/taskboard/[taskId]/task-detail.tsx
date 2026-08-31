@@ -71,7 +71,11 @@ export function TaskDetail({
   function handleDelete() {
     router.push("/taskboard");
     deleteTaskAction(task.id).then((result) => {
-      if ("error" in result) toast.error(result.error);
+      if ("error" in result) {
+        toast.error(result.error);
+      } else {
+        toast.success("Task deleted.");
+      }
     });
   }
 

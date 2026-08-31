@@ -43,5 +43,5 @@ export async function createTaskAction(formData: FormData) {
     creatorUserId: session.user.id,
   });
 
-  redirect("/dashboard");
+  redirect("/dashboard?taskCreated=1");
 }

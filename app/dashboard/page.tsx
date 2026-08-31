@@ -1,9 +1,11 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/lib/auth";
 import { getUserFlatsWithMembers } from "@/lib/flats";
+import { getRecentCompletions } from "@/lib/tasks";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -51,5 +53,19 @@ export default async function DashboardPage() {
     );
   }
 
-  return <DashboardContent flats={flats} currentUserId={session.user.id} />;
+  const recentCompletionsByFlatId = Object.fromEntries(
+    await Promise.all(
+      flats.map(async (f) => [f.id, await getRecentCompletions(f.id)] as const),
+    ),
+  );
+
+  return (
+    <Suspense>
+      <DashboardContent
+        flats={flats}
+        currentUserId={session.user.id}
+        recentCompletionsByFlatId={recentCompletionsByFlatId}
+      />
+    </Suspense>
+  );
 }

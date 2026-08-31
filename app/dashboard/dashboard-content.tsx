@@ -1,7 +1,8 @@
 "use client";
 
-import { useOptimistic, useState, useTransition, type FormEvent } from "react";
+import { useEffect, useOptimistic, useRef, useState, useTransition, type FormEvent } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -20,6 +21,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { FlatMember, FlatWithMembers } from "@/lib/flats";
+import type { RecentCompletion } from "@/lib/tasks";
 import { getAvatarColor, getInitials } from "@/lib/utils";
 import { removeMemberAction, sendInviteAction } from "./actions";
 import { FlatsBar } from "./flats-bar";
@@ -27,12 +29,30 @@ import { FlatsBar } from "./flats-bar";
 export function DashboardContent({
   flats,
   currentUserId,
+  recentCompletionsByFlatId,
 }: {
   flats: FlatWithMembers[];
   currentUserId: string;
+  recentCompletionsByFlatId: Record<string, RecentCompletion[]>;
 }) {
   const [activeFlatId, setActiveFlatId] = useState(flats[0]?.id);
   const activeFlat = flats.find((f) => f.id === activeFlatId) ?? flats[0];
+
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const hasShownToast = useRef(false);
+  useEffect(() => {
+    if (hasShownToast.current) return;
+    if (searchParams.get("flatCreated") === "1") {
+      hasShownToast.current = true;
+      toast.success("Flat created!");
+      router.replace("/dashboard");
+    } else if (searchParams.get("taskCreated") === "1") {
+      hasShownToast.current = true;
+      toast.success("Task added to the board.");
+      router.replace("/dashboard");
+    }
+  }, [searchParams, router]);
 
   const [optimisticMembers, applyOptimisticMembers] = useOptimistic(
     activeFlat.members,
@@ -50,6 +70,7 @@ export function DashboardContent({
 
   const myMembership = optimisticMembers.find((m) => m.userId === currentUserId);
   const isAdmin = myMembership?.role === "admin";
+  const recentCompletions = recentCompletionsByFlatId[activeFlat.id] ?? [];
 
   const handleInvite = (e: FormEvent) => {
     e.preventDefault();
@@ -175,22 +196,38 @@ export function DashboardContent({
               key={member.id}
               className="flex flex-wrap items-center justify-between gap-3 border-2 border-border bg-white p-4 shadow-shadow"
             >
-              <div className="flex min-w-0 flex-1 items-center gap-3">
-                <Avatar>
-                  {member.image && (
-                    <AvatarImage src={member.image} alt={member.name ?? member.email} />
-                  )}
-                  <AvatarFallback className={`${getAvatarColor(member.id)} text-foreground`}>
-                    {member.name ? getInitials(member.name) : member.email.charAt(0).toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-lg font-extrabold">{member.name ?? member.email}</p>
-                  {member.name && (
-                    <p className="truncate text-sm font-bold text-foreground/70">{member.email}</p>
-                  )}
+              {member.status === "verified" ? (
+                <Link
+                  href={`/members/${member.id}`}
+                  className="flex min-w-0 flex-1 cursor-pointer items-center gap-3"
+                >
+                  <Avatar>
+                    {member.image && (
+                      <AvatarImage src={member.image} alt={member.name ?? member.email} />
+                    )}
+                    <AvatarFallback className={`${getAvatarColor(member.id)} text-foreground`}>
+                      {member.name ? getInitials(member.name) : member.email.charAt(0).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-lg font-extrabold">{member.name ?? member.email}</p>
+                    {member.name && (
+                      <p className="truncate text-sm font-bold text-foreground/70">{member.email}</p>
+                    )}
+                  </div>
+                </Link>
+              ) : (
+                <div className="flex min-w-0 flex-1 items-center gap-3">
+                  <Avatar>
+                    <AvatarFallback className={`${getAvatarColor(member.id)} text-foreground`}>
+                      {member.email.charAt(0).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-lg font-extrabold">{member.email}</p>
+                  </div>
                 </div>
-              </div>
+              )}
               <div className="flex items-center gap-2">
                 <Badge variant={member.role === "admin" ? "default" : "neutral"}>
                   {member.role}
@@ -217,7 +254,7 @@ export function DashboardContent({
 
       <section>
         <div className="flex flex-wrap items-end justify-between gap-3">
-          <h2 className="text-2xl md:text-3xl">Needs a body</h2>
+          <h2 className="text-2xl md:text-3xl">Recently completed</h2>
           <Button
             asChild
             variant="noShadow"
@@ -227,11 +264,50 @@ export function DashboardContent({
             <Link href={`/add-task?flat=${activeFlat.id}`}>+ Add task</Link>
           </Button>
         </div>
-        <Card className="mt-4 bg-secondary-background">
-          <CardContent>
-            <p className="font-bold">No tasks yet — the task board is coming soon.</p>
-          </CardContent>
-        </Card>
+
+        {recentCompletions.length === 0 ? (
+          <Card className="mt-4 bg-secondary-background">
+            <CardContent>
+              <p className="font-bold">Nothing completed yet — finish a chore to see it here.</p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="mt-4 flex flex-col gap-3">
+            {recentCompletions.map((c) => (
+              <Link
+                key={c.id}
+                href={`/taskboard/${c.taskId}`}
+                className="flex flex-wrap items-center justify-between gap-3 border-2 border-border bg-white p-4 shadow-shadow hover:bg-amber-300"
+              >
+                <div className="flex min-w-0 items-center gap-3">
+                  <Avatar className="size-8">
+                    {c.completedByUser.image && (
+                      <AvatarImage src={c.completedByUser.image} alt={c.completedByUser.name} />
+                    )}
+                    <AvatarFallback
+                      className={`${getAvatarColor(c.completedBy)} text-sm font-bold text-foreground`}
+                    >
+                      {getInitials(c.completedByUser.name)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0">
+                    <p className="truncate text-lg font-extrabold">{c.task.name}</p>
+                    <p className="truncate text-sm font-bold text-foreground/70">
+                      {c.completedByUser.name} ·{" "}
+                      {c.completedAt.toLocaleDateString(undefined, {
+                        month: "short",
+                        day: "numeric",
+                      })}
+                    </p>
+                  </div>
+                </div>
+                <Badge className="bg-lime-300 text-foreground">
+                  {c.effortPointsAtCompletion} pts
+                </Badge>
+              </Link>
+            ))}
+          </div>
+        )}
       </section>
 
       <Dialog

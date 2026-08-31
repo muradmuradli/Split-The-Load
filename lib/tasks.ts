@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 
 import { db } from "./db";
 import { completion, flat, membership, task, user } from "./db/schema";
@@ -12,6 +12,11 @@ export type TaskWithAssignee = typeof task.$inferSelect & {
 
 export type TaskWithAssigneeAndFlat = TaskWithAssignee & {
   flat: typeof flat.$inferSelect;
+};
+
+export type RecentCompletion = typeof completion.$inferSelect & {
+  task: typeof task.$inferSelect;
+  completedByUser: typeof user.$inferSelect;
 };
 
 /** Every task on a flat's board, newest first, with the assignee's user record joined in. */
@@ -28,6 +33,26 @@ export async function getTaskById(taskId: string): Promise<TaskWithAssigneeAndFl
   return db.query.task.findFirst({
     where: eq(task.id, taskId),
     with: { assignee: { with: { user: true } }, flat: true },
+  });
+}
+
+/** The most recently completed tasks for a flat, newest first, with who completed each. */
+export async function getRecentCompletions(
+  flatId: string,
+  limit = 5,
+): Promise<RecentCompletion[]> {
+  const flatTasks = await db.query.task.findMany({
+    where: eq(task.flatId, flatId),
+    columns: { id: true },
+  });
+  const taskIds = flatTasks.map((t) => t.id);
+  if (taskIds.length === 0) return [];
+
+  return db.query.completion.findMany({
+    where: inArray(completion.taskId, taskIds),
+    with: { task: true, completedByUser: true },
+    orderBy: (fields, { desc }) => [desc(fields.completedAt)],
+    limit,
   });
 }
 

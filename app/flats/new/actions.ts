@@ -39,5 +39,5 @@ export async function createFlatAction(formData: FormData) {
     origin,
   });
 
-  redirect("/dashboard");
+  redirect("/dashboard?flatCreated=1");
 }

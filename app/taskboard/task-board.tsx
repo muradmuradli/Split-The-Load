@@ -60,7 +60,11 @@ export function TaskBoard({ flatName, tasks }: { flatName: string; tasks: TaskBo
     startTransition(async () => {
       removeOptimisticTask(taskId);
       const result = await deleteTaskAction(taskId);
-      if ("error" in result) toast.error(result.error);
+      if ("error" in result) {
+        toast.error(result.error);
+      } else {
+        toast.success("Task deleted.");
+      }
     });
   }
 
