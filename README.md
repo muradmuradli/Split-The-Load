@@ -1,36 +1,76 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Split the Load
 
-## Getting Started
+Chores aren't equal. Scrubbing the bathroom and taking out the trash both count as "one task" on most chore apps, which is how you end up with one flatmate quietly doing twice the work. Split the Load scores every chore by effort instead of just checking it off a list, so a flat can actually agree on who's carrying their weight.
 
-First, run the development server:
+Built it for my own flat, mostly. Sharing it in case it's useful to yours too.
+
+![Dashboard](public/dashboard.png)
+
+## What it does
+
+- **Flats & invites** — create a flat, invite housemates by email, they click a link and join. No accounts to set up manually.
+- **Effort-scored tasks** — every chore is tagged Quick, Medium, or Heavy, each worth a starting number of points. Assign it to someone directly, or let it auto-assign to whoever's currently carrying the least.
+- **Recurring chores that self-correct** — mark a repeating task "harder" or "easier" than expected when you finish it, and its score nudges itself (10% at a time) toward reality over the next few times it comes around, instead of staying wrong forever.
+- **A real history** — every completed chore is logged with who did it, when it was created, when it was finished, and what it was worth at the time — so the record doesn't silently change when a recurring task's score drifts later.
+
+## Screenshots
+
+| Task board                           | Add a task                         |
+| ------------------------------------ | ---------------------------------- |
+| ![Task board](public/task_board.png) | ![Add a task](public/add_task.png) |
+
+![History](public/history.png)
+
+## Stack
+
+- [Next.js](https://nextjs.org) (App Router) + TypeScript
+- [Drizzle ORM](https://orm.drizzle.team) on Postgres ([Neon](https://neon.tech))
+- [better-auth](https://www.better-auth.com) for email/password auth + email verification
+- [Brevo](https://www.brevo.com) for transactional email (invites, password resets)
+- Tailwind CSS + a neobrutalist shadcn/radix component set.
+
+## Running it locally
+
+You'll need a Postgres database (Neon works well, but any Postgres will do) and a [Brevo](https://www.brevo.com) account for sending email.
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+pnpm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Copy `.env.example` to `.env` (or just create `.env`) and fill in:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+DATABASE_URL=
+BETTER_AUTH_SECRET=      # any long random string
+BETTER_AUTH_URL=http://localhost:3000
+BREVO_API_KEY=
+EMAIL_FROM=
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Push the schema to your database:
 
-## Learn More
+```bash
+pnpm drizzle-kit migrate
+```
 
-To learn more about Next.js, take a look at the following resources:
+Then start the dev server:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+pnpm dev
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Open [http://localhost:3000](http://localhost:3000).
 
-## Deploy on Vercel
+## Project layout
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+The short version, if you're poking around:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- `app/` — routes. Mostly self-explanatory: `dashboard`, `taskboard`, `add-task`, `history`, `flats/new`, `invite/[token]`, `members/[membershipId]`.
+- `lib/flats.ts` / `lib/tasks.ts` — the actual business logic (creating flats, invites, tasks, completions, the effort-drift algorithm). The `app/*/actions.ts` files are thin wrappers around these for use as server actions.
+- `lib/db/schema.ts` — the Drizzle schema; `drizzle/` has the generated migrations.
+- `components/ui/` — the design system components.
+
+## A couple of honest caveats
+
+- No mobile app, it's just a responsive web app.
+- The effort-drift algorithm is deliberately simple (a fixed 10% nudge per rating) — no fuzzy matching, no duplicate-task detection, nothing fancy. It does the one job it's meant to do.
