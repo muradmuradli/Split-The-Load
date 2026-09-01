@@ -4,6 +4,17 @@ Chores aren't equal. Scrubbing the bathroom and taking out the trash both count 
 
 Built it for my own flat, mostly. Sharing it in case it's useful to yours too.
 
+## Try it
+
+Live at [splittheload.vercel.app](https://splittheload.vercel.app) — sign in with a demo account instead of creating your own:
+
+```
+email:    demo@splittheload.app
+password: Demo1234!
+```
+
+It's a shared account with a seeded flat ("The Demo Flat"), a couple of fake housemates, and a mix of tasks (some done, some not, a couple recurring) so there's actually something to look at. It's fully mutable — feel free to poke at it, rename things, delete stuff. There's nothing paid or sensitive behind it, so don't worry about breaking anything; just know that whatever the last person did is what you'll see.
+
 ![Dashboard](public/dashboard.png)
 
 ## What it does
